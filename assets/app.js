@@ -447,7 +447,7 @@ function renderOrders() {
     box.innerHTML = `<p class="muted">Trading opens once the market contract is deployed.</p>`;
     return;
   }
-  const list = S.orders.filter((o) => o.active && o.fillable && o.maker !== S.account &&
+  const list = S.orders.filter((o) => o.active && o.fillable &&
     (S.kindFilter === "all" || o.kind === Number(S.kindFilter)) &&
     (!S.levelFilter || orderLevel(o) === Number(S.levelFilter)));
   box.replaceChildren(...list.map((o) => orderRow(o)).filter(Boolean));
