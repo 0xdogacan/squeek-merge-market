@@ -540,12 +540,16 @@ function renderLevels() {
       <span>Level ${l}</span> <span class="pw">${powerOf(l) ? fmt(powerOf(l)) : ""}</span><span class="n">${fmt(counts.get(l) || 0)}</span></label>`);
     li.querySelector("input").addEventListener("change", (e) => {
       if (e.target.checked) S.levels.add(l); else S.levels.delete(l);
-      S.page = 1; renderItems(); $("levels-clear").hidden = !S.levels.size;
+      resetItems(); $("levels-clear").hidden = !S.levels.size;
     });
     return li;
   }));
   $("levels-clear").hidden = !S.levels.size;
 }
+
+// Infinite scroll: S.page is how many pages of PAGE items are on screen. Filter and
+// sort changes reset it to 1; background refreshes keep it, so the grid doesn't jump.
+let itemList = [];
 
 function renderItems() {
   const grid = $("grid");
@@ -554,12 +558,9 @@ function renderItems() {
     grid.replaceChildren(...Array.from({ length: 12 }, () => el("div", "skel")));
     return;
   }
-  const list = filtered();
-  const pages = Math.max(1, Math.ceil(list.length / PAGE));
-  S.page = Math.min(S.page, pages);
-  const slice = list.slice((S.page - 1) * PAGE, S.page * PAGE);
-  $("showing").textContent = list.length ? `Showing ${fmt(slice.length)} of ${fmt(list.length)} items` : "No items";
-  if (!list.length) {
+  itemList = filtered();
+  S.page = Math.max(1, Math.min(S.page, Math.ceil(itemList.length / PAGE)));
+  if (!itemList.length) {
     const msg = S.status === "mine" && !S.account ? `<b>Connect your wallet</b> to see your Squeeks.<br><button class="btn btn-dark" data-act="connect">Connect</button>`
       : S.status === "mine" ? `No Squeeks in this wallet on Sepolia.`
       : S.status === "listed" ? `Nothing listed${S.levels.size ? " at this level" : ""} yet. Own a Squeek? Open it and list it, or post a level bid.`
@@ -567,33 +568,40 @@ function renderItems() {
     grid.innerHTML = `<div class="empty">${msg}</div>`;
     grid.querySelector("[data-act=connect]")?.addEventListener("click", connect);
   } else {
-    grid.replaceChildren(...slice.map(itemCard));
+    grid.replaceChildren(...itemList.slice(0, S.page * PAGE).map(itemCard));
   }
-  renderPager(pages);
+  updateShowing();
 }
 
-function renderPager(pages) {
-  const nav = $("pager");
-  nav.replaceChildren();
-  if (pages <= 1) return;
-  const btn = (label, page, opts = {}) => {
-    const b = el("button", "", label);
-    b.type = "button";
-    if (opts.current) b.setAttribute("aria-current", "page");
-    if (opts.disabled) b.disabled = true;
-    b.addEventListener("click", () => { S.page = page; renderItems(); $("tab-items").scrollIntoView({ behavior: "smooth", block: "start" }); });
-    return b;
-  };
-  nav.append(btn("‹", S.page - 1, { disabled: S.page === 1 }));
-  const show = new Set([1, pages, S.page - 1, S.page, S.page + 1].filter((p) => p >= 1 && p <= pages));
-  let prev = 0;
-  for (const p of [...show].sort((a, b) => a - b)) {
-    if (p - prev > 1) nav.append(el("span", "gap", "…"));
-    nav.append(btn(String(p), p, { current: p === S.page }));
-    prev = p;
-  }
-  nav.append(btn("›", S.page + 1, { disabled: S.page === pages }));
+function resetItems() {
+  S.page = 1;
+  renderItems();
+  const top = $("tab-items").getBoundingClientRect().top;
+  if (top < 0) window.scrollBy({ top: top - 70 });
 }
+
+function updateShowing() {
+  const shown = Math.min(S.page * PAGE, itemList.length);
+  $("showing").textContent = itemList.length ? `Showing ${fmt(shown)} of ${fmt(itemList.length)} items` : "No items";
+  $("more").hidden = shown >= itemList.length;
+}
+
+function loadMore() {
+  const shown = S.page * PAGE;
+  if (shown >= itemList.length || S.tab !== "items") return;
+  S.page++;
+  $("grid").append(...itemList.slice(shown, S.page * PAGE).map(itemCard));
+  updateShowing();
+  // The observer only fires on changes; keep going while the loader is still near the viewport.
+  requestAnimationFrame(() => {
+    const m = $("more");
+    if (!m.hidden && m.getBoundingClientRect().top < innerHeight + 900) loadMore();
+  });
+}
+
+new IntersectionObserver((entries) => {
+  if (entries.some((e) => e.isIntersecting)) loadMore();
+}, { rootMargin: "900px" }).observe($("more"));
 
 /* ================================================================ render: offers */
 
@@ -713,7 +721,7 @@ function renderMerge() {
     <div><dt>NEED A PARTNER</dt><dd>${fmt(lonely.length)}</dd></div>`));
 
   if (!mine.length) {
-    box.append(el("div", "empty", `No Squeeks in this wallet on Sepolia yet. Browse <b>ITEMS_</b> to buy one, or post a level bid and let sellers come to you.`));
+    box.append(el("div", "empty", `No Squeeks in this wallet on Sepolia yet. Browse <b>ITEMS</b> to buy one, or post a level bid and let sellers come to you.`));
   }
 
   if (pairs.length) {
@@ -766,7 +774,7 @@ function renderMerge() {
         g.append(...candidates.map(itemCard));
         body.append(g);
       }
-      if (swaps.length) body.append(el("p", "note", `${swaps.length} swap offer${swaps.length > 1 ? "s" : ""} for a Level ${t.level} you can accept. See OFFERS_.`));
+      if (swaps.length) body.append(el("p", "note", `${swaps.length} swap offer${swaps.length > 1 ? "s" : ""} for a Level ${t.level} you can accept. See OFFERS.`));
       if (!candidates.length && !swaps.length) body.append(el("p", "none", `No Level ${t.level} on sale right now. A bid tells every Level ${t.level} owner you're buying.`));
       sec.append(body);
       box.append(sec);
@@ -838,7 +846,7 @@ function openItem(id) {
 function renderTraits(id, m) {
   const box = $("item-traits");
   const attrs = (m?.attrs || []).filter((a) => a.k !== "" && a.v !== undefined && a.v !== null);
-  box.innerHTML = attrs.length ? `<h4>TRAITS_</h4><div class="traits">${attrs.map((a) => `<div><span>${esc(a.k)}</span><b>${esc(a.v)}</b></div>`).join("")}</div>` : "";
+  box.innerHTML = attrs.length ? `<h4>TRAITS</h4><div class="traits">${attrs.map((a) => `<div><span>${esc(a.k)}</span><b>${esc(a.v)}</b></div>`).join("")}</div>` : "";
 }
 
 function renderItemBody(t) {
@@ -846,7 +854,7 @@ function renderItemBody(t) {
   const sell = S.sells.get(t.id);
   const mySell = S.orders.find((o) => o.kind === KIND.SELL && o.tokenId === t.id && o.maker === S.account);
   const left = mine ? cooldownLeft(t.id) : 0;
-  $("item-eyebrow").textContent = `SQUEEKS_ · LEVEL ${t.level}`;
+  $("item-eyebrow").textContent = `SQUEEKS · LEVEL ${t.level}`;
   $("item-title").textContent = `Squeek #${t.id}`;
   $("item-owner").innerHTML = `Owned by ${addrLink(t.owner)}${t.staked ? " · in Staking" : ""}`;
   $("item-kv").innerHTML = `
@@ -893,7 +901,7 @@ function renderItemBody(t) {
   if (S.account && t.level < S.maxLevel) {
     const partners = myTokens().filter((m) => m.id !== t.id && m.level === t.level);
     if (mine && partners.length) {
-      mbox.append(el("h4", "", `MERGE WITH_ <span class="muted">${mergeGain(t.level)}</span>`));
+      mbox.append(el("h4", "", `MERGE WITH <span class="muted">${mergeGain(t.level)}</span>`));
       const row = el("div", "partners");
       for (const p of partners) {
         const b = el("button", "", `<span>#${p.id}${p.staked !== t.staked ? " ·⚠" : ""}</span>`);
@@ -908,7 +916,7 @@ function renderItemBody(t) {
       mbox.append(el("div", "callout", `You own a Level ${t.level} (${partners.map((p) => `#${p.id}`).join(", ")}). Get this one and you can merge them: <b>${mergeGain(t.level)}</b>.`));
     } else if (mine) {
       const onSale = [...S.sells.values()].filter((o) => S.tokens.get(o.tokenId)?.level === t.level && o.maker !== S.account).length;
-      mbox.append(el("div", "callout", `No Level ${t.level} partner in your wallet. ${onSale ? `<b>${onSale}</b> on sale right now, see MERGE_.` : "Post a level bid to find one."}`));
+      mbox.append(el("div", "callout", `No Level ${t.level} partner in your wallet. ${onSale ? `<b>${onSale}</b> on sale right now, see MERGE.` : "Post a level bid to find one."}`));
     }
   }
 
@@ -917,7 +925,7 @@ function renderItemBody(t) {
   const obox = $("item-orders");
   obox.replaceChildren();
   if (rel.length) {
-    obox.append(el("h4", "", "OPEN ORDERS_"));
+    obox.append(el("h4", "", "OPEN ORDERS"));
     const list = el("div", "olist");
     for (const o of rel) {
       const txt = o.kind === KIND.SELL ? `For sale · ${eth(o.price)}` : o.tokenId === t.id ? `Swap for ${describeWant(o)}` : `Swap: #${o.tokenId} offered for this one`;
@@ -1131,6 +1139,7 @@ function setTab(tab) {
   if (tab === "offers") renderOffers();
   if (tab === "merge") renderMerge();
   if (tab === "activity") renderActivity();
+  if (tab === "items") requestAnimationFrame(() => { if (!$("more").hidden && $("more").getBoundingClientRect().top < innerHeight + 900) loadMore(); });
   history.replaceState(null, "", tab === "items" ? location.pathname + location.search : `#${tab}`);
 }
 
@@ -1141,10 +1150,10 @@ function pressSeg(seg, attr, value) {
 document.querySelectorAll(".tabs [role=tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
 $("status-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  S.status = b.dataset.status; S.page = 1;
+  S.status = b.dataset.status;
   if (S.status === "listed" && S.sort === "id") S.sort = "price";
   pressSeg($("status-seg"), "status", S.status);
-  renderItems();
+  resetItems();
 });
 $("cols-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
@@ -1157,8 +1166,8 @@ $("offer-seg").addEventListener("click", (e) => {
   S.offerKind = b.dataset.kind; pressSeg($("offer-seg"), "kind", S.offerKind); renderOffers();
 });
 $("offer-level").addEventListener("change", (e) => { S.offerLevel = e.target.value; renderOffers(); });
-$("sort").addEventListener("change", (e) => { S.sort = e.target.value; S.page = 1; renderItems(); });
-$("levels-clear").addEventListener("click", () => { S.levels.clear(); S.page = 1; renderLevels(); renderItems(); });
+$("sort").addEventListener("change", (e) => { S.sort = e.target.value; resetItems(); });
+$("levels-clear").addEventListener("click", () => { S.levels.clear(); renderLevels(); resetItems(); });
 $("filters-toggle").addEventListener("click", () => $("filters").classList.toggle("open"));
 $("refresh").addEventListener("click", () => refreshAll());
 $("connect").addEventListener("click", () => { if (!S.account) connect(); else { S.status = "mine"; pressSeg($("status-seg"), "status", "mine"); setTab("items"); renderItems(); } });

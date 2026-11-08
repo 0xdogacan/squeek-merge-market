@@ -37,14 +37,13 @@
 
   <section class="banner" aria-hidden="true">
     <div class="banner-art" id="banner-art"></div>
-    <div class="banner-title">SQUEEKS_</div>
   </section>
 
   <section class="coll wrap">
     <div class="coll-id">
       <div class="avatar"><img id="avatar" alt=""></div>
       <div>
-        <h1>Squeeks_</h1>
+        <h1>Squeeks</h1>
         <div class="chips">
           <span class="chip" id="chip-items">— ITEMS</span>
           <span class="chip">LEVELS 1–<span id="chip-max">10</span></span>
@@ -54,20 +53,20 @@
       </div>
     </div>
     <dl class="stats">
-      <div><dt>FLOOR_</dt><dd id="st-floor">—</dd></div>
-      <div><dt>BEST_BID_</dt><dd id="st-bid">—</dd></div>
-      <div><dt>VOLUME_</dt><dd id="st-volume">—</dd></div>
-      <div><dt>LISTED_</dt><dd id="st-listed">—</dd></div>
-      <div><dt>OWNERS_</dt><dd id="st-owners">—</dd></div>
-      <div><dt>MERGED_</dt><dd id="st-merged">—</dd></div>
+      <div><dt>FLOOR</dt><dd id="st-floor">—</dd></div>
+      <div><dt>BEST BID</dt><dd id="st-bid">—</dd></div>
+      <div><dt>VOLUME</dt><dd id="st-volume">—</dd></div>
+      <div><dt>LISTED</dt><dd id="st-listed">—</dd></div>
+      <div><dt>OWNERS</dt><dd id="st-owners">—</dd></div>
+      <div><dt>MERGED</dt><dd id="st-merged">—</dd></div>
     </dl>
   </section>
 
   <nav class="tabs wrap" role="tablist">
-    <button role="tab" data-tab="items" aria-selected="true">ITEMS_</button>
-    <button role="tab" data-tab="offers" aria-selected="false">OFFERS_ <span class="count" id="count-offers"></span></button>
-    <button role="tab" data-tab="merge" aria-selected="false">MERGE_ <span class="tag">FIND PARTNER</span></button>
-    <button role="tab" data-tab="activity" aria-selected="false">ACTIVITY_</button>
+    <button role="tab" data-tab="items" aria-selected="true">ITEMS</button>
+    <button role="tab" data-tab="offers" aria-selected="false">OFFERS <span class="count" id="count-offers"></span></button>
+    <button role="tab" data-tab="merge" aria-selected="false">MERGE <span class="tag">FIND PARTNER</span></button>
+    <button role="tab" data-tab="activity" aria-selected="false">ACTIVITY</button>
     <span class="tabs-spacer"></span>
     <button class="btn btn-ghost btn-sm" id="post-bid" type="button">Make a level bid</button>
   </nav>
@@ -77,7 +76,7 @@
     <section class="panel-items" id="tab-items">
       <aside class="filters" id="filters">
         <div class="fgroup">
-          <div class="flabel">STATUS_</div>
+          <div class="flabel">STATUS</div>
           <div class="seg" id="status-seg">
             <button data-status="all" aria-pressed="true">All</button>
             <button data-status="listed" aria-pressed="false">Listed</button>
@@ -86,12 +85,12 @@
           </div>
         </div>
         <div class="fgroup">
-          <div class="flabel">LEVEL_ <button class="link small" id="levels-clear" type="button" hidden>clear</button></div>
+          <div class="flabel">LEVEL <button class="link small" id="levels-clear" type="button" hidden>clear</button></div>
           <ul class="levels" id="levels"></ul>
         </div>
         <div class="fgroup finfo">
-          <div class="flabel">ABOUT_</div>
-          <p>Two Squeeks of the same level merge into one a level higher with 10% more power. Use <b>MERGE_</b> to find the partner yours needs.</p>
+          <div class="flabel">ABOUT</div>
+          <p>Two Squeeks of the same level merge into one a level higher with 10% more power. Use <b>MERGE</b> to find the partner yours needs.</p>
         </div>
       </aside>
 
@@ -116,7 +115,7 @@
           </button>
         </div>
         <div class="grid" id="grid" data-cols="6"></div>
-        <nav class="pager" id="pager" aria-label="Pages"></nav>
+        <div class="more" id="more" aria-hidden="true"><span></span><span></span><span></span></div>
       </section>
     </section>
 
