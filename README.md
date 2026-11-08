@@ -48,6 +48,6 @@ Plain HTML, CSS and JS modules (ethers v6 vendored), no build step. Vercel funct
 | --- | --- |
 | SqueekNFT | `0xC4C7982657f00509548F3a3a41db7FA439a6856B` |
 | SqueekStaking | `0x50fd1780526C3186A0c037c7622203bC4fb611ca` |
-| MergeMarket | set after deployment |
+| MergeMarket | [`0x64eFD359CF2Eea11D9A91759E434BBF8a6DbdcDF`](https://sepolia.etherscan.io/address/0x64eFD359CF2Eea11D9A91759E434BBF8a6DbdcDF) |
 
 Independent, open-source tool for Squeekchain; not affiliated with it. Testnet only.
