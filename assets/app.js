@@ -535,7 +535,9 @@ function renderLevels() {
   const counts = new Map();
   for (const t of S.tokens.values()) counts.set(t.level, (counts.get(t.level) || 0) + 1);
   const ul = $("levels");
-  ul.replaceChildren(...Array.from({ length: S.maxLevel }, (_, i) => i + 1).map((l) => {
+  // Only levels that exist (plus any still selected) are worth a row.
+  const shown = Array.from({ length: S.maxLevel }, (_, i) => i + 1).filter((l) => counts.get(l) || S.levels.has(l));
+  ul.replaceChildren(...shown.map((l) => {
     const li = el("li", "", `<label><input type="checkbox" value="${l}" ${S.levels.has(l) ? "checked" : ""}>
       <span>Level ${l}</span> <span class="pw">${powerOf(l) ? fmt(powerOf(l)) : ""}</span><span class="n">${fmt(counts.get(l) || 0)}</span></label>`);
     li.querySelector("input").addEventListener("change", (e) => {
