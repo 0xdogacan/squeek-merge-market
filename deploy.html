@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploy · Merge Market</title>
+  <meta name="robots" content="noindex">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="top"><a class="brand" href="/"><span class="mark">⇄</span>MERGE<span>MARKET</span></a></header>
+  <main class="wrap">
+    <section class="hero">
+      <p class="eyebrow">ONE-TIME SETUP</p>
+      <h1>Deploy the contract</h1>
+      <p class="lede">This deploys MergeMarket to Sepolia from your wallet, pointed at SqueekNFT. The contract has no owner: after this, nobody (including you) can change, pause or upgrade it.</p>
+    </section>
+    <section class="panel">
+      <ol>
+        <li>Make sure your wallet is on <b>Sepolia</b> and has a little Sepolia ETH for gas.</li>
+        <li>Click <b>Deploy</b> and confirm in your wallet.</li>
+        <li>When it is confirmed, click <b>Verify on Sourcify</b>, then send the address to whoever maintains this site.</li>
+      </ol>
+      <p class="muted small">SqueekNFT: <span class="mono" id="squeek"></span></p>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn" id="deploy">Deploy</button>
+        <button class="btn btn-ghost" id="verify" disabled>Verify on Sourcify</button>
+      </div>
+      <p id="out" class="notice" hidden></p>
+      <p class="muted small">Already deployed? <input type="text" id="addr" placeholder="0x…" style="width:22em"> <button class="btn btn-small btn-ghost" id="use">Use this address</button></p>
+    </section>
+  </main>
+  <script type="module">
+    import { ethers } from "/assets/ethers.min.js";
+    import { CONFIG } from "/assets/config.js";
+    const $ = (id) => document.getElementById(id);
+    const out = (html) => { $("out").innerHTML = html; $("out").hidden = false; };
+    $("squeek").textContent = CONFIG.squeek;
+    let deployed = "";
+
+    function ready(address) {
+      deployed = address;
+      $("addr").value = address;
+      $("verify").disabled = false;
+      out(`Contract: <a href="${CONFIG.explorer}/address/${address}" target="_blank" rel="noopener" class="mono">${address}</a> · <a href="/?market=${address}">Open the market with it</a>`);
+    }
+
+    $("deploy").addEventListener("click", async () => {
+      try {
+        if (!window.ethereum) throw new Error("No wallet found.");
+        const provider = new ethers.BrowserProvider(window.ethereum, "any");
+        await provider.send("eth_requestAccounts", []);
+        const net = await provider.getNetwork();
+        if (Number(net.chainId) !== CONFIG.chainId) {
+          await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: ethers.toQuantity(CONFIG.chainId) }] });
+          throw new Error("Switched to Sepolia. Click Deploy again.");
+        }
+        const signer = await provider.getSigner();
+        const art = await (await fetch("/assets/MergeMarket.json")).json();
+        const factory = new ethers.ContractFactory(art.abi, art.bytecode, signer);
+        out("Confirm the deployment in your wallet…");
+        const c = await factory.deploy(CONFIG.squeek);
+        out(`Deploying… <a href="${CONFIG.explorer}/tx/${c.deploymentTransaction().hash}" target="_blank" rel="noopener">view transaction</a>`);
+        await c.waitForDeployment();
+        ready(await c.getAddress());
+      } catch (err) {
+        out(`<span class="error">${err?.shortMessage || err?.message || err}</span>`);
+      }
+    });
+
+    $("use").addEventListener("click", () => {
+      const a = $("addr").value.trim();
+      if (/^0x[0-9a-fA-F]{40}$/.test(a)) ready(a); else out(`<span class="error">That is not an address.</span>`);
+    });
+
+    $("verify").addEventListener("click", async () => {
+      out("Submitting to Sourcify…");
+      try {
+        const r = await fetch("/api/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: deployed }) });
+        const j = await r.json();
+        const status = j?.result?.[0]?.status || j?.status;
+        if (r.ok && /perfect|full|partial/i.test(String(status))) {
+          out(`Verified on Sourcify (${status} match). <a href="https://repo.sourcify.dev/contracts/full_match/${CONFIG.chainId}/${deployed}/" target="_blank" rel="noopener">See it</a> · Contract <span class="mono">${deployed}</span>`);
+        } else {
+          out(`<span class="error">Sourcify said: ${JSON.stringify(j).slice(0, 300)}</span>`);
+        }
+      } catch (err) {
+        out(`<span class="error">${err.message}</span>`);
+      }
+    });
+  </script>
+</body>
+</html>

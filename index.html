@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Merge Market · Find your Squeek's merge partner</title>
+  <meta name="description" content="Peer-to-peer trading for Squeeks, built around merging. Find a same-level partner, swap or buy it safely, and merge. Ownerless, fee-free.">
+  <meta property="og:title" content="Merge Market">
+  <meta property="og:description" content="Find your Squeek's merge partner. Swap, buy or bid peer to peer. Ownerless and fee-free.">
+  <meta name="theme-color" content="#0a0b10">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/"><span class="mark" aria-hidden="true">⇄</span>MERGE<span>MARKET</span></a>
+    <nav class="nav">
+      <a href="#mine">Your Squeeks</a>
+      <a href="#market">Market</a>
+      <a href="/how.html">How it works</a>
+    </nav>
+    <button class="btn btn-small" id="connect">Connect wallet</button>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <p class="eyebrow">SQUEEKCHAIN · SEPOLIA</p>
+      <h1>Find your Squeek's<br>merge partner.</h1>
+      <p class="lede">Merging needs two Squeeks of the same level. Merge Market shows which of yours are missing a partner, finds one on the market, and trades it to you in a single transaction. Then merge.</p>
+      <ul class="facts">
+        <li><strong>Ownerless</strong><span>No admin, no pause, no upgrade</span></li>
+        <li><strong>Fee-free</strong><span>Only the collection's royalty</span></li>
+        <li><strong>Non-custodial</strong><span>Squeeks stay in your wallet until they trade</span></li>
+      </ul>
+      <p class="notice" id="no-market" hidden>The market contract is not deployed yet. You can browse your Squeeks; trading opens once it is live.</p>
+      <p class="notice warn" id="net-warn" hidden>Your wallet is on another network. <button class="linklike" id="switch-net">Switch to Sepolia</button></p>
+    </section>
+
+    <section class="panel" id="mine">
+      <div class="panel-head">
+        <h2>Your Squeeks</h2>
+        <span class="muted small" id="mine-meta"></span>
+      </div>
+      <div id="pairs" class="pairs"></div>
+      <div id="mine-grid" class="grid"><p class="muted">Connect your wallet to see your Squeeks.</p></div>
+    </section>
+
+    <section class="panel" id="market">
+      <div class="panel-head">
+        <h2>Market</h2>
+        <button class="btn btn-small btn-ghost" id="post-bid">Post a bid</button>
+      </div>
+      <div class="filters">
+        <div class="seg" role="tablist" id="kind-tabs">
+          <button role="tab" data-kind="all" aria-selected="true">All</button>
+          <button role="tab" data-kind="0" aria-selected="false">For sale</button>
+          <button role="tab" data-kind="1" aria-selected="false">Swaps</button>
+          <button role="tab" data-kind="2" aria-selected="false">Bids</button>
+        </div>
+        <label class="level-filter">Level
+          <select id="level-filter"><option value="">Any</option></select>
+        </label>
+      </div>
+      <div id="orders" class="orders"><p class="muted">Loading the market…</p></div>
+    </section>
+
+    <section class="panel" id="my-orders-panel" hidden>
+      <div class="panel-head">
+        <h2>Your orders</h2>
+        <button class="btn btn-small btn-ghost" id="withdraw" hidden>Withdraw credit</button>
+      </div>
+      <div id="my-orders" class="orders"></div>
+    </section>
+
+    <footer class="foot">
+      <p>Merge Market is an independent, open-source tool for Squeekchain, not affiliated with it. Contract: <a id="market-link" target="_blank" rel="noopener">—</a> · <a href="https://github.com/0xdogacan/squeek-merge-market" target="_blank" rel="noopener">Source</a></p>
+      <p>Testnet only. Sepolia ETH and test Squeeks have no value.</p>
+    </footer>
+  </main>
+
+  <dialog id="sheet" class="sheet">
+    <form method="dialog" id="sheet-form">
+      <h2 id="sheet-title"></h2>
+      <div id="sheet-body"></div>
+      <p class="error" id="sheet-error" hidden></p>
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" id="sheet-cancel">Cancel</button>
+        <button type="submit" class="btn" id="sheet-go">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

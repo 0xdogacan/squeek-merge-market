@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How it works · Merge Market</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <style>.prose p, .prose li { color: #cfd3e3; } .prose h2 { margin-top: 26px; } code { font-family: var(--mono); color: var(--gold); font-size: 14px; }</style>
+</head>
+<body>
+  <header class="top"><a class="brand" href="/"><span class="mark">⇄</span>MERGE<span>MARKET</span></a><nav class="nav"><a href="/">Back to the market</a></nav></header>
+  <main class="wrap prose">
+    <section class="hero">
+      <p class="eyebrow">HOW IT WORKS</p>
+      <h1>Two Squeeks in,<br>one stronger out.</h1>
+      <p class="lede">On Squeekchain, two Squeeks of the same level merge into one Squeek a level higher, with 10% more power than the pair. The catch: you need that second Squeek. Merge Market is built to find it.</p>
+    </section>
+
+    <h2>Three kinds of order</h2>
+    <ul>
+      <li><strong>For sale:</strong> list a Squeek for ETH. It stays in your wallet until someone buys it.</li>
+      <li><strong>Swap:</strong> offer your Squeek for a specific Squeek, or for any Squeek of a level. When someone accepts, both Squeeks change hands in the same transaction.</li>
+      <li><strong>Bid:</strong> put up ETH for any Squeek of a level ("I need a Level 3"). The ETH waits in the contract until someone sells into it, or you cancel and take it back.</li>
+    </ul>
+
+    <h2>Finding a partner</h2>
+    <ul>
+      <li>The site reads your Squeeks (in your wallet and in Staking), their levels and merge cooldowns.</li>
+      <li>Pairs that can merge now get a one-click merge button. In your wallet it calls <code>SqueekNFT.merge</code>; for two staked Squeeks it calls <code>SqueekStaking.mergeDeposited</code>.</li>
+      <li>A Squeek without a partner shows how many matching Squeeks are on the market, and lets you bid or offer a swap.</li>
+      <li>Before you trade, the site shows the power you would have after merging, read from Staking's <code>basePower</code>.</li>
+    </ul>
+
+    <h2>Safety</h2>
+    <ul>
+      <li><strong>Non-custodial:</strong> Squeeks never sit in the contract. A trade moves them straight from one wallet to the other, so listings cost nothing to keep and can't be lost.</li>
+      <li><strong>Ownerless:</strong> no admin key, no pause, no upgrade. The contract is verified on Sourcify, so anyone can read the exact code that runs.</li>
+      <li><strong>Fee-free:</strong> Merge Market takes nothing. The collection's ERC-2981 royalty is paid on ETH sales, capped at 10%.</li>
+      <li><strong>Stale orders can't hurt you:</strong> if a maker moves, merges or un-approves their Squeek, their order simply stops being fillable. A trade either completes in full or not at all.</li>
+      <li>Approving the market lets it move your Squeeks only as part of a trade you or your counterparty sign. You can revoke the approval any time.</li>
+      <li>Staked Squeeks are held by Staking and can't be traded; withdraw them first. A Squeek's level and merge cooldown travel with it; earned rewards stay with the seller.</li>
+    </ul>
+
+    <h2>Open source</h2>
+    <p>Contract, tests and site: <a href="https://github.com/0xdogacan/squeek-merge-market" target="_blank" rel="noopener">github.com/0xdogacan/squeek-merge-market</a>. The contract test suite covers sales, swaps, bids, royalties, expiry, stale orders, reentrancy and payout fallbacks.</p>
+    <p class="muted small">Independent tool for Squeekchain, not affiliated with it. Sepolia testnet only.</p>
+  </main>
+</body>
+</html>
