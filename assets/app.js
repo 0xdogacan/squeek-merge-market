@@ -57,8 +57,9 @@ const S = {
   sort: "price",
   cols: "6",
   page: 1,
-  offerKind: "all",
-  offerLevel: "",
+  view: "market",         // market | swap | partner | profile
+  swapFilter: "all",
+  swapLevel: "",
   loaded: false,
 };
 
@@ -268,7 +269,8 @@ async function connect() {
     const net = await provider.getNetwork();
     S.chainOk = Number(net.chainId) === CONFIG.chainId;
     $("net-warn").hidden = S.chainOk;
-    $("connect").textContent = short(S.account);
+    try { localStorage.removeItem("mm-logged-out"); } catch { /* ignore */ }
+    syncWalletUi();
     window.ethereum.on?.("accountsChanged", () => location.reload());
     window.ethereum.on?.("chainChanged", () => location.reload());
     await loadMine();
@@ -276,6 +278,28 @@ async function connect() {
   } catch (err) {
     toast(reason(err), "bad");
   }
+}
+
+function syncWalletUi() {
+  $("connect").textContent = S.account ? short(S.account) : "Connect";
+  $("wallet").classList.toggle("connected", Boolean(S.account));
+  $("rail-sign-label").textContent = S.account ? "Profile" : "Sign in";
+}
+
+async function logout() {
+  S.account = null;
+  S.signer = null;
+  S.nextMerge = new Map();
+  S.credit = 0n;
+  try { localStorage.setItem("mm-logged-out", "1"); } catch { /* ignore */ }
+  // Wallets that support it forget the site's permission; others just stop being used.
+  window.ethereum?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }).catch(() => {});
+  $("net-warn").hidden = true;
+  $("credit-note")?.remove();
+  syncWalletUi();
+  if (S.view === "profile") go("/");
+  renderAll();
+  toast("Logged out.");
 }
 
 async function switchNetwork() {
@@ -330,7 +354,7 @@ async function loadBasics() {
   if (CONFIG.squeekchainApi) {
     fetch(`${CONFIG.squeekchainApi}/v1/status`, { cache: "no-store", signal: AbortSignal.timeout(6000) })
       .then((r) => r.json())
-      .then((st) => { const h = Number(st?.builder?.anchor?.blockHeight ?? NaN); S.completedHeight = Number.isFinite(h) ? h : null; if (S.tab === "merge") renderMerge(); })
+      .then((st) => { const h = Number(st?.builder?.anchor?.blockHeight ?? NaN); S.completedHeight = Number.isFinite(h) ? h : null; if (S.view === "profile") renderProfile(); })
       .catch(() => {});
   }
 }
@@ -491,7 +515,8 @@ function renderHeader() {
   $("st-merged").textContent = fmt(S.burned);
   $("chip-items").textContent = `${fmt(S.tokens.size)} ITEMS`;
   $("chip-max").textContent = S.maxLevel;
-  $("count-offers").textContent = S.orders.filter((o) => o.kind !== KIND.SELL && o.fillable).length || "";
+  $("count-swaps").textContent = S.orders.filter((o) => o.kind === KIND.SWAP && o.fillable).length || "";
+  $("count-bids").textContent = S.orders.filter((o) => o.kind === KIND.BID && o.fillable).length || "";
   $("foot-block").textContent = S.head ? fmt(S.head) : "—";
   const link = $("market-link");
   if (CONFIG.market) { link.href = `${CONFIG.explorer}/address/${CONFIG.market}#code`; link.textContent = short(CONFIG.market); }
@@ -730,7 +755,7 @@ function updateShowing() {
 
 function loadMore() {
   const shown = S.page * PAGE;
-  if (shown >= itemList.length || S.tab !== "items") return;
+  if (shown >= itemList.length || S.tab !== "items" || S.view !== "market") return;
   S.page++;
   $("grid").append(...itemList.slice(shown, S.page * PAGE).map(itemCard));
   updateShowing();
@@ -777,49 +802,98 @@ function orderAction(o) {
   return b;
 }
 
-function renderOffers() {
-  const sel = $("offer-level");
-  if (sel.options.length !== S.maxLevel + 1) {
-    sel.innerHTML = `<option value="">All levels</option>${Array.from({ length: S.maxLevel }, (_, i) => `<option value="${i + 1}">Level ${i + 1}</option>`).join("")}`;
+/* ================================================================ render: swap page */
+
+function swapSide(id, label) {
+  const side = el("div", "swap-side");
+  const pic = el("div", "pic");
+  pic.append(artImg(id, `Squeek #${id}`));
+  pic.addEventListener("click", () => openItem(id));
+  const t = S.tokens.get(id);
+  side.append(pic, el("span", "", `${label}<br><b>#${id}${t ? ` · Level ${t.level}` : ""}</b>`));
+  return side;
+}
+
+function renderSwaps() {
+  const sel = $("swap-level");
+  if (sel.options.length !== S.maxLevel + 1) sel.innerHTML = `<option value="">All levels</option>${Array.from({ length: S.maxLevel }, (_, i) => `<option value="${i + 1}">Level ${i + 1}</option>`).join("")}`;
+  sel.value = S.swapLevel;
+  pressSeg($("swap-seg"), "f", S.swapFilter);
+  const lvl = (o) => S.tokens.get(o.tokenId)?.level;
+  const list = S.orders.filter((o) => o.kind === KIND.SWAP && (o.fillable || o.maker === S.account) &&
+    (S.swapFilter === "all" || (S.swapFilter === "mine" ? o.maker === S.account : o.maker !== S.account && canFillSwap(o).length > 0)) &&
+    (!S.swapLevel || lvl(o) === Number(S.swapLevel) || (!o.wantTokenId && o.wantLevel === Number(S.swapLevel))))
+    .sort((a, b) => b.id - a.id);
+  const box = $("swaps");
+  if (!list.length) {
+    const msg = S.swapFilter === "mine" ? (S.account ? "You have no open swap offers." : "Connect your wallet to see your swap offers.")
+      : S.swapFilter === "can" ? (S.account ? "No swap offers you can accept with the Squeeks in your wallet." : "Connect your wallet to see offers you can accept.")
+      : "No swap offers yet. Be the first: offer one of your Squeeks for the level you need.";
+    box.innerHTML = `<div class="empty" style="grid-column:1/-1">${msg}</div>`;
+    return;
   }
-  sel.value = S.offerLevel;
-  const lvlOf = (o) => (o.kind === KIND.BID ? o.wantLevel : S.tokens.get(o.tokenId)?.level);
-  const list = S.orders.filter((o) => (o.fillable || o.maker === S.account) &&
-    (S.offerKind === "all" ? true : o.kind === Number(S.offerKind)) &&
-    (!S.offerLevel || lvlOf(o) === Number(S.offerLevel)))
-    .sort((a, b) => (a.kind === KIND.BID && b.kind === KIND.BID ? (b.price > a.price ? 1 : -1) : b.id - a.id));
-  const body = $("offers-table").querySelector("tbody");
-  body.replaceChildren(...list.map((o) => {
-    const tr = el("tr");
-    const kindName = ["sell", "swap", "bid"][o.kind];
-    const label = ["FOR SALE", "SWAP", "LEVEL BID"][o.kind];
-    tr.append(el("td", "", `<span class="kind ${kindName}">${label}</span>`));
-    const item = el("td");
-    const wrap = el("div", "titem");
-    if (o.kind === KIND.BID) {
-      wrap.append(el("span", "thumb any", `L${o.wantLevel}`), el("span", "", `Any Level ${o.wantLevel}`));
-      wrap.style.cursor = "default";
-    } else {
-      const t = S.tokens.get(o.tokenId);
-      wrap.append(thumb(o.tokenId), el("span", "", `#${o.tokenId}${t ? ` <span class="muted">· LV ${t.level}</span>` : ""}`));
-      wrap.addEventListener("click", () => openItem(o.tokenId));
+  box.replaceChildren(...list.map((o) => {
+    const card = el("div", "swap-card");
+    const pair = el("div", "swap-pair");
+    pair.append(swapSide(o.tokenId, o.maker === S.account ? "You give" : "You get"), el("span", "swap-arrow", "⇄"));
+    if (o.wantTokenId) pair.append(swapSide(o.wantTokenId, o.maker === S.account ? "You get" : "You give"));
+    else {
+      const side = el("div", "swap-side");
+      side.append(el("div", "pic any", `LV ${o.wantLevel}`), el("span", "", `${o.maker === S.account ? "You get" : "You give"}<br><b>Any Level ${o.wantLevel}</b>`));
+      pair.append(side);
     }
-    item.append(wrap);
-    tr.append(item);
-    tr.append(el("td", "", o.kind === KIND.SWAP ? esc(describeWant(o)) : o.kind === KIND.BID ? "Squeek" : "ETH"));
-    tr.append(el("td", "num", o.kind === KIND.SWAP ? "—" : eth(o.price)));
-    tr.append(el("td", "", addrLink(o.maker)));
-    tr.append(el("td", "", o.expiry ? new Date(o.expiry * 1000).toLocaleDateString() : "Never"));
+    const foot = el("div", "swap-foot", `<span class="grow">by ${addrLink(o.maker)}${o.expiry ? ` · until ${new Date(o.expiry * 1000).toLocaleDateString()}` : ""}</span>`);
+    foot.append(orderAction(o));
+    card.append(pair, foot);
+    return card;
+  }));
+}
+
+/* ================================================================ render: find a partner page */
+
+function renderPartner() {
+  const bids = S.orders.filter((o) => o.kind === KIND.BID && (o.fillable || o.maker === S.account)).sort((a, b) => (b.price > a.price ? 1 : b.price < a.price ? -1 : a.id - b.id));
+  const counts = new Map();
+  for (const t of S.tokens.values()) counts.set(t.level, (counts.get(t.level) || 0) + 1);
+  const levels = Array.from({ length: S.maxLevel }, (_, i) => i + 1).filter((l) => counts.get(l) || bids.some((o) => o.wantLevel === l));
+  $("levelcards").replaceChildren(...levels.map((l) => {
+    const lb = bids.filter((o) => o.wantLevel === l && o.fillable);
+    const best = lb[0];
+    const card = el("div", "levelcard", `<span class="lv">LEVEL ${l} · ${fmt(counts.get(l) || 0)} SQUEEKS</span>
+      <span class="best">${best ? `${ethNum(best.price)} <small>ETH best bid</small>` : `<small>No bids yet</small>`}</span>
+      <span class="meta">${lb.length} bid${lb.length === 1 ? "" : "s"}${powerOf(l) ? ` · ${fmt(powerOf(l))} power` : ""}</span>`);
+    const btns = el("div", "btns");
+    const bid = el("button", "btn btn-sm btn-dark", `Bid for Level ${l}`);
+    bid.type = "button";
+    bid.addEventListener("click", () => openBid(l));
+    btns.append(bid);
+    const top = bestBid(l);
+    if (top && myTokens().some((t) => !t.staked && t.level === l)) {
+      const sell = el("button", "btn btn-sm", "Sell to best bid");
+      sell.type = "button";
+      sell.addEventListener("click", () => openAcceptBid(top));
+      btns.append(sell);
+    }
+    card.append(btns);
+    return card;
+  }));
+  const body = $("bids-table").querySelector("tbody");
+  body.replaceChildren(...bids.map((o) => {
+    const tr = el("tr");
+    const lv = el("td");
+    const w = el("div", "titem");
+    w.style.cursor = "default";
+    w.append(el("span", "thumb any", `L${o.wantLevel}`), el("span", "", `Any Level ${o.wantLevel}`));
+    lv.append(w);
+    tr.append(lv, el("td", "num", eth(o.price)), el("td", "", addrLink(o.maker)), el("td", "", o.expiry ? new Date(o.expiry * 1000).toLocaleDateString() : "Never"));
     const act = el("td", "act");
     act.append(orderAction(o));
     tr.append(act);
     return tr;
   }));
-  $("offers-table").parentElement.hidden = !list.length;
-  const empty = $("offers-empty");
-  empty.hidden = Boolean(list.length);
-  empty.innerHTML = `No open offers${S.offerLevel ? ` at Level ${S.offerLevel}` : ""}. <br><button class="btn btn-dark" type="button">Make a level bid</button>`;
-  empty.querySelector("button").onclick = () => openBid(S.offerLevel ? Number(S.offerLevel) : null);
+  $("bids-table").parentElement.hidden = !bids.length;
+  $("bids-empty").hidden = Boolean(bids.length);
+  $("bids-empty").textContent = "No bids yet. Need a partner for your Squeek? Make the first level bid.";
 }
 
 /* ================================================================ render: merge */
@@ -831,13 +905,64 @@ function mini(id) {
   return d;
 }
 
-function renderMerge() {
-  const box = $("merge-body");
+function renderProfile() {
+  const root = $("profile");
   if (!S.account) {
-    box.innerHTML = `<div class="empty"><b>Find the partner your Squeek needs.</b><br>Connect your wallet to see which of your Squeeks can merge now, and which need a partner from the market.<br><button class="btn btn-dark" type="button">Connect wallet</button></div>`;
-    box.querySelector("button").addEventListener("click", connect);
+    root.innerHTML = `<div class="empty"><b>Your profile</b><br>Sign in with your wallet to see your Squeeks, merge them and manage your listings.<br><button class="btn btn-dark" type="button">Sign in</button></div>`;
+    root.querySelector("button").addEventListener("click", connect);
     return;
   }
+  const mine = myTokens();
+  root.replaceChildren();
+  const head = el("header", "profile-head");
+  const pfp = el("div", "pfp", mine.length ? "" : "?");
+  if (mine.length) pfp.append(artImg(mine[0].id));
+  head.append(pfp, el("div", "", `<div class="eyebrow">PROFILE</div><h1>${short(S.account)}</h1>
+    <div class="addr"><span class="mono">${S.account}</span><a href="${CONFIG.explorer}/address/${S.account}" target="_blank" rel="noopener">Etherscan ↗</a><button class="link" type="button" id="logout2">Log out</button></div>`));
+  head.querySelector("#logout2").addEventListener("click", logout);
+  root.append(head);
+
+  // Order: stats, your Squeeks, merge pairs and partners, open orders, power ladder.
+  const merge = el("div");
+  renderMerge(merge);
+  const stats = merge.querySelector(".merge-head");
+  const ladder = [...merge.children].slice(-2);
+  ladder.forEach((n) => n.remove());
+  stats.remove();
+  root.append(stats);
+
+  const sec = el("section", "profile-sec");
+  sec.append(el("h3", "sec-title", `YOUR SQUEEKS <span class="muted">${mine.length ? "click one to list, swap or merge it" : ""}</span>`));
+  if (mine.length) {
+    const g = el("div", "grid");
+    g.append(...mine.map(itemCard));
+    sec.append(g);
+  } else {
+    sec.append(el("div", "empty", `You don't have any Squeeks in this wallet on Sepolia yet.<br><a class="btn btn-dark" href="/" data-nav>Browse the market</a>`));
+  }
+  root.append(sec);
+  if (merge.childElementCount) { merge.className = "profile-sec"; root.append(merge); }
+
+  const orders = S.orders.filter((o) => o.maker === S.account);
+  const os = el("section", "profile-sec");
+  os.append(el("h3", "sec-title", `YOUR OPEN ORDERS <span class="muted">${orders.length || "none"}</span>`));
+  if (orders.length) {
+    const list = el("div", "olist");
+    for (const o of orders) {
+      const txt = o.kind === KIND.SELL ? `#${o.tokenId} for sale · ${eth(o.price)}` : o.kind === KIND.SWAP ? `#${o.tokenId} for ${describeWant(o)}` : `Bid for any Level ${o.wantLevel} · ${eth(o.price)}`;
+      const row = el("div", "orow", `<span class="kind ${["sell", "swap", "bid"][o.kind]}">${["SALE", "SWAP", "BID"][o.kind]}</span><span class="grow">${esc(txt)}${o.fillable ? "" : " · not fillable now"}</span>`);
+      row.append(orderAction(o));
+      list.append(row);
+    }
+    os.append(list);
+  }
+  root.append(os);
+  const ls = el("section", "profile-sec");
+  ls.append(...ladder);
+  root.append(ls);
+}
+
+function renderMerge(box) {
   const mine = myTokens();
   const totalPower = mine.reduce((s, t) => s + (powerOf(t.level) || 0), 0);
   const byLevel = new Map();
@@ -862,9 +987,6 @@ function renderMerge() {
     <div><dt>READY PAIRS</dt><dd>${fmt(pairs.length)}</dd></div>
     <div><dt>NEED A PARTNER</dt><dd>${fmt(lonely.length)}</dd></div>`));
 
-  if (!mine.length) {
-    box.append(el("div", "empty", `No Squeeks in this wallet on Sepolia yet. Browse <b>ITEMS</b> to buy one, or post a level bid and let sellers come to you.`));
-  }
 
   if (pairs.length) {
     box.append(el("h3", "sec-title", `READY TO MERGE <span class="muted">same level, off cooldown</span>`));
@@ -916,7 +1038,7 @@ function renderMerge() {
         g.append(...candidates.map(itemCard));
         body.append(g);
       }
-      if (swaps.length) body.append(el("p", "note", `${swaps.length} swap offer${swaps.length > 1 ? "s" : ""} for a Level ${t.level} you can accept. See OFFERS.`));
+      if (swaps.length) body.append(el("p", "note", `${swaps.length} swap offer${swaps.length > 1 ? "s" : ""} for a Level ${t.level} you can accept. See Swap.`));
       if (!candidates.length && !swaps.length) body.append(el("p", "none", `No Level ${t.level} on sale right now. A bid tells every Level ${t.level} owner you're buying.`));
       sec.append(body);
       box.append(sec);
@@ -1062,7 +1184,7 @@ function renderItemBody(t) {
       mbox.append(el("div", "callout", `You own a Level ${t.level} (${partners.map((p) => `#${p.id}`).join(", ")}). Get this one and you can merge them: <b>${mergeGain(t.level)}</b>.`));
     } else if (mine) {
       const onSale = [...S.sells.values()].filter((o) => S.tokens.get(o.tokenId)?.level === t.level && o.maker !== S.account).length;
-      mbox.append(el("div", "callout", `No Level ${t.level} partner in your wallet. ${onSale ? `<b>${onSale}</b> on sale right now, see MERGE.` : "Post a level bid to find one."}`));
+      mbox.append(el("div", "callout", `No Level ${t.level} partner in your wallet. ${onSale ? `<b>${onSale}</b> on sale right now, see your Profile.` : "Post a level bid on Find a Partner."}`));
     }
   }
 
@@ -1265,9 +1387,7 @@ function renderAll() {
   renderLevels();
   renderTraitFilters();
   renderItems();
-  if (S.tab === "offers") renderOffers();
-  if (S.tab === "merge") renderMerge();
-  if (S.tab === "activity") renderActivity();
+  renderView();
   if (S.credit > 0n && !$("credit-note")) {
     const n = el("div", "netwarn", `You have ${eth(S.credit)} waiting from a trade. <button class="link" type="button">Withdraw</button>`);
     n.id = "credit-note";
@@ -1279,16 +1399,60 @@ function renderAll() {
   }
 }
 
+function renderView() {
+  if (S.view === "market" && S.tab === "activity") renderActivity();
+  if (S.view === "swap") renderSwaps();
+  if (S.view === "partner") renderPartner();
+  if (S.view === "profile") renderProfile();
+}
+
 function setTab(tab) {
   S.tab = tab;
   document.querySelectorAll(".tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
-  for (const t of ["items", "offers", "merge", "activity"]) $(`tab-${t}`).hidden = t !== tab;
-  if (tab === "offers") renderOffers();
-  if (tab === "merge") renderMerge();
+  for (const t of ["items", "activity"]) $(`tab-${t}`).hidden = t !== tab;
   if (tab === "activity") renderActivity();
-  if (tab === "items") requestAnimationFrame(() => { if (!$("more").hidden && $("more").getBoundingClientRect().top < innerHeight + 900) loadMore(); });
-  history.replaceState(null, "", tab === "items" ? location.pathname + location.search : `#${tab}`);
+  if (tab === "items") nudgeMore();
+  history.replaceState(null, "", tab === "items" ? location.pathname + location.search : `${location.pathname}${location.search}#${tab}`);
 }
+
+function nudgeMore() {
+  requestAnimationFrame(() => { if (!$("more").hidden && $("more").getBoundingClientRect().top < innerHeight + 900) loadMore(); });
+}
+
+/* Pages: /, /swap, /partner and /profile are one app; the server rewrites them to index.html. */
+const ROUTES = { "/": "market", "/swap": "swap", "/partner": "partner", "/profile": "profile" };
+const TITLES = { market: "Merge Market · Squeeks", swap: "Swap · Merge Market", partner: "Find a Partner · Merge Market", profile: "Profile · Merge Market" };
+
+function showView() {
+  const path = location.pathname.replace(/\/+$/, "") || "/";
+  S.view = ROUTES[path] || "market";
+  document.querySelectorAll("[data-page]").forEach((p) => { p.hidden = p.dataset.page !== S.view; });
+  document.querySelectorAll("[data-page-link]").forEach((a) => {
+    if (a.dataset.pageLink === S.view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  document.title = TITLES[S.view];
+  $("rail").classList.remove("open");
+  renderView();
+  if (S.view === "market" && S.tab === "items") nudgeMore();
+}
+
+function go(path) {
+  const keep = new URLSearchParams(location.search);
+  const qs = keep.toString();
+  if (location.pathname !== path) history.pushState(null, "", path + (qs ? `?${qs}` : ""));
+  showView();
+  window.scrollTo({ top: 0 });
+}
+
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("a[data-nav]");
+  if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  if ($("item").open) $("item").close();
+  a.blur();
+  go(new URL(a.href).pathname);
+});
+window.addEventListener("popstate", showView);
 
 function pressSeg(seg, attr, value) {
   seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
@@ -1307,16 +1471,21 @@ $("cols-seg").addEventListener("click", (e) => {
   try { localStorage.setItem("mm-cols", S.cols); } catch { /* ignore */ }
   renderItems();
 });
-$("offer-seg").addEventListener("click", (e) => {
+$("swap-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  S.offerKind = b.dataset.kind; pressSeg($("offer-seg"), "kind", S.offerKind); renderOffers();
+  S.swapFilter = b.dataset.f; renderSwaps();
 });
-$("offer-level").addEventListener("change", (e) => { S.offerLevel = e.target.value; renderOffers(); });
+$("swap-level").addEventListener("change", (e) => { S.swapLevel = e.target.value; renderSwaps(); });
+$("offer-swap").addEventListener("click", () => openSwap(null, {}));
+$("logout").addEventListener("click", logout);
+$("rail-sign").addEventListener("click", () => { if (!S.account) connect(); else go("/profile"); });
+$("menu-btn").addEventListener("click", () => $("rail").classList.add("open"));
+$("rail-scrim").addEventListener("click", () => $("rail").classList.remove("open"));
 $("sort").addEventListener("change", (e) => { S.sort = e.target.value; resetItems(); });
 $("levels-clear").addEventListener("click", () => { S.levels.clear(); renderLevels(); resetItems(); });
 $("filters-toggle").addEventListener("click", () => $("filters").classList.toggle("open"));
 $("refresh").addEventListener("click", () => refreshAll());
-$("connect").addEventListener("click", () => { if (!S.account) connect(); else setTab("merge"); });
+$("connect").addEventListener("click", () => { if (!S.account) connect(); else go("/profile"); });
 $("stake-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   S.stake = S.stake === b.dataset.stake ? "" : b.dataset.stake; // one at a time; click again to clear
@@ -1343,10 +1512,13 @@ document.addEventListener("keydown", (e) => {
 
 try { const c = localStorage.getItem("mm-cols"); if (c) { S.cols = c; pressSeg($("cols-seg"), "cols", c); } } catch { /* ignore */ }
 if (!CONFIG.market) $("post-bid").disabled = true;
-const startTab = location.hash.slice(1);
-if (["offers", "merge", "activity"].includes(startTab)) setTab(startTab);
+if (location.hash === "#activity") setTab("activity");
+showView();
 renderItems();
 refreshAll().then(() => {
+  let loggedOut = false;
+  try { loggedOut = localStorage.getItem("mm-logged-out") === "1"; } catch { /* ignore */ }
+  if (loggedOut) return;
   window.ethereum?.request({ method: "eth_accounts" }).then((a) => { if (a?.length) connect(); }).catch(() => {});
 });
 setInterval(() => { if (!document.hidden && !$("sheet").open) refreshAll({ quiet: true }); }, 60_000);
