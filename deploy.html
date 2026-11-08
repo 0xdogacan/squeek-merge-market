@@ -80,11 +80,13 @@
       try {
         const r = await fetch("/api/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: deployed }) });
         const j = await r.json();
-        const status = j?.result?.[0]?.status || j?.status;
-        if (r.ok && /perfect|full|partial/i.test(String(status))) {
-          out(`Verified on Sourcify (${status} match). <a href="https://repo.sourcify.dev/contracts/full_match/${CONFIG.chainId}/${deployed}/" target="_blank" rel="noopener">See it</a> · Contract <span class="mono">${deployed}</span>`);
+        const link = `<a href="https://repo.sourcify.dev/${CONFIG.chainId}/${deployed}" target="_blank" rel="noopener">See it on Sourcify</a>`;
+        if (j.verified) {
+          out(`Verified on Sourcify (${j.match}). ${link} · Contract <span class="mono">${deployed}</span>`);
+        } else if (j.pending) {
+          out(`Sourcify is still checking. Give it a minute, then ${link}.`);
         } else {
-          out(`<span class="error">Sourcify said: ${JSON.stringify(j).slice(0, 300)}</span>`);
+          out(`<span class="error">Sourcify said: ${String(j.error || JSON.stringify(j)).slice(0, 300)}</span>`);
         }
       } catch (err) {
         out(`<span class="error">${err.message}</span>`);

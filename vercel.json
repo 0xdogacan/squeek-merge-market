@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/verify.js": { "includeFiles": "assets/MergeMarket.*" }
+    "api/verify.js": { "includeFiles": "assets/MergeMarket.*", "maxDuration": 60 }
   },
   "headers": [
     {
