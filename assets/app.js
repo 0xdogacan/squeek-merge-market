@@ -216,34 +216,40 @@ function meta(id) {
   return p;
 }
 
-function setImg(img, id, ph) {
-  meta(id).then((m) => {
-    if (!m.src) { if (ph) ph.textContent = "NO IMAGE"; return; }
-    img.onload = () => { img.classList.add("on"); ph?.classList.add("hide"); };
-    img.src = m.src;
-  });
+// Images come from /api/art (cached on the CDN for good); if that fails, the API/tokenURI path.
+const artSrc = (id) => `/api/art?id=${id}`;
+
+function loadArt(img, id, onOk) {
+  img.decoding = "async";
+  img.onload = () => onOk?.();
+  img.onerror = () => {
+    img.onerror = null;
+    meta(id).then((m) => { if (m.src) img.src = m.src; });
+  };
+  img.src = artSrc(id);
 }
 
-const observer = new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    if (!e.isIntersecting) continue;
-    observer.unobserve(e.target);
-    const id = Number(e.target.dataset.id);
-    setImg(e.target.querySelector("img"), id, e.target.querySelector(".ph"));
-  }
-}, { rootMargin: "300px" });
+function artImg(id, alt = "") {
+  const i = new Image();
+  i.alt = alt;
+  loadArt(i, id);
+  return i;
+}
 
 function artBox(id, level) {
-  const box = el("div", "art", `<span class="ph">#${id}</span><img alt="Squeek #${id}" decoding="async">`);
-  box.dataset.id = id;
+  const box = el("div", "art", `<span class="ph">#${id}</span><img alt="Squeek #${id}" loading="lazy">`);
+  const img = box.querySelector("img");
+  const ph = box.querySelector(".ph");
+  loadArt(img, id, () => { img.classList.add("on"); ph.classList.add("hide"); });
   if (level) box.prepend(el("span", `badge-lvl l${level}`, `LV ${level}`));
-  observer.observe(box);
   return box;
 }
 
 function thumb(id) {
-  const t = el("span", "thumb", `#${id}`);
-  meta(id).then((m) => { if (m.src) { t.textContent = ""; const i = new Image(); i.alt = ""; i.src = m.src; t.append(i); } });
+  const t = el("span", "thumb");
+  const i = artImg(id);
+  i.loading = "lazy";
+  t.append(i);
   return t;
 }
 
@@ -428,10 +434,14 @@ async function loadMine() {
 
 async function refreshAll({ quiet = false } = {}) {
   try {
-    if (!S.loaded) await loadBasics();
-    await Promise.all([loadCollection(), loadOrders(), loadTraits()]);
-    await Promise.all([loadMine(), loadActivity().catch((e) => console.warn("activity", e))]);
+    // Grid first (collection, orders, traits in parallel); wallet and activity after.
+    await Promise.all([
+      S.loaded ? null : loadBasics().catch((e) => console.warn("basics", e)),
+      loadCollection(), loadOrders(), loadTraits(),
+    ]);
     S.loaded = true;
+    renderAll();
+    await Promise.all([loadMine(), loadActivity().catch((e) => console.warn("activity", e))]);
   } catch (err) {
     console.error(err);
     if (!quiet) toast(`Could not load everything: ${reason(err)}`, "bad");
@@ -500,11 +510,9 @@ function renderBanner() {
   }
   const art = $("banner-art");
   art.replaceChildren(...pick.map((id) => {
-    const s = el("span");
-    meta(id).then((m) => { if (m.src) { const i = new Image(); i.alt = ""; i.src = m.src; s.replaceWith(i); } });
-    return s;
+    return artImg(id);
   }));
-  meta(pick[0] ?? ids[0]).then((m) => { if (m.src) $("avatar").src = m.src; });
+  loadArt($("avatar"), pick[0] ?? ids[0]);
 }
 
 /* ================================================================ render: items */
@@ -818,7 +826,7 @@ function renderOffers() {
 
 function mini(id) {
   const d = el("div", "mini");
-  meta(id).then((m) => { if (m.src) { const i = new Image(); i.alt = `Squeek #${id}`; i.src = m.src; d.append(i); } });
+  d.append(artImg(id, `Squeek #${id}`));
   d.addEventListener("click", () => openItem(id));
   return d;
 }
@@ -972,7 +980,9 @@ function openItem(id) {
   const dlg = $("item");
   const img = $("item-img");
   img.removeAttribute("src");
-  meta(id).then((m) => { if (currentItem === id && m.src) img.src = m.src; renderTraits(id, m); });
+  loadArt(img, id);
+  if (TR.rows.has(id)) renderTraits(id, null);
+  else meta(id).then((m) => { if (currentItem === id) renderTraits(id, m); });
   renderItemBody(t);
   if (!dlg.open) dlg.showModal();
 }
@@ -1043,7 +1053,7 @@ function renderItemBody(t) {
         const b = el("button", "", `<span>#${p.id}${p.staked !== t.staked ? " ·⚠" : ""}</span>`);
         b.type = "button";
         b.title = p.staked !== t.staked ? "One is staked and one isn't: both must be in the same place to merge" : `Merge #${t.id} + #${p.id}`;
-        meta(p.id).then((m) => { if (m.src) { const i = new Image(); i.alt = ""; i.src = m.src; b.prepend(i); } });
+        b.prepend(artImg(p.id));
         b.addEventListener("click", () => { if (p.staked === t.staked) doMerge(t, p); else toast(b.title, "bad"); });
         row.append(b);
       }

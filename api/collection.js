@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       t.push([id, idx.get(owner), s.level.get(id) ?? 1, staked ? 1 : 0]);
     }
     t.sort((a, b) => a[0] - b[0]);
-    res.setHeader("cache-control", minBlock ? "no-store" : "public, s-maxage=10, stale-while-revalidate=30");
+    res.setHeader("cache-control", minBlock ? "no-store" : "public, s-maxage=15, stale-while-revalidate=86400");
     res.status(200).json({ scannedTo: s.scannedTo, maxLevel: s.maxLevel, burned: s.burns, owners, t });
   } catch (err) {
     res.status(503).json({ error: "Could not read the collection right now.", detail: String(err?.message || err) });

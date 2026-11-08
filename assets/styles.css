@@ -125,7 +125,7 @@ button, input, select { font: inherit; color: inherit; }
 .tabs-spacer { flex: 1; }
 
 /* ---------------------------------------------------------------- items layout */
-.panel-items { display: grid; grid-template-columns: 236px 1fr; gap: 28px; padding: 24px 0 8px; }
+.panel-items { display: grid; grid-template-columns: 252px 1fr; gap: 28px; padding: 24px 0 8px; }
 .filters { position: sticky; top: 88px; align-self: start; display: grid; gap: 26px; max-height: calc(100vh - 104px); overflow-y: auto; padding-right: 6px; scrollbar-width: thin; }
 .flabel { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -134,6 +134,8 @@ button, input, select { font: inherit; color: inherit; }
   font-size: 12.5px; cursor: pointer; border-radius: 2px;
 }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.filters .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
+.filters .seg button { height: 32px; padding: 0 6px; font-size: 12px; white-space: nowrap; }
 .seg-sm button { height: 32px; min-width: 36px; padding: 0 10px; font-size: 12px; }
 .levels { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
 .levels li { border-bottom: 1px solid var(--line); }
