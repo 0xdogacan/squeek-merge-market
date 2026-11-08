@@ -2,9 +2,25 @@
 pragma solidity 0.8.28;
 
 /// @dev Local-chain stand-ins used only for end-to-end checks of the site.
+interface IMockSqueek {
+    function transferFrom(address from, address to, uint256 id) external;
+    function merge(uint256 survivor, uint256 donor) external;
+}
+
 contract MockStaking {
-    function depositor(address, uint256) external pure returns (address) {
-        return address(0);
+    mapping(address => mapping(uint256 => address)) public depositor;
+
+    function deposit(address collection, uint256[] calldata ids) external {
+        for (uint256 i = 0; i < ids.length; i++) {
+            IMockSqueek(collection).transferFrom(msg.sender, address(this), ids[i]);
+            depositor[collection][ids[i]] = msg.sender;
+        }
+    }
+
+    function mergeDeposited(address collection, uint256 survivor, uint256 donor) external {
+        require(depositor[collection][survivor] == msg.sender && depositor[collection][donor] == msg.sender, "depositor");
+        IMockSqueek(collection).merge(survivor, donor);
+        delete depositor[collection][donor];
     }
 
     function basePower(address, uint8 level) external pure returns (uint64) {

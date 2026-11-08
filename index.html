@@ -2,98 +2,203 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Merge Market · Find your Squeek's merge partner</title>
-  <meta name="description" content="Peer-to-peer trading for Squeeks, built around merging. Find a same-level partner, swap or buy it safely, and merge. Ownerless, fee-free.">
-  <meta property="og:title" content="Merge Market">
-  <meta property="og:description" content="Find your Squeek's merge partner. Swap, buy or bid peer to peer. Ownerless and fee-free.">
-  <meta name="theme-color" content="#0a0b10">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Merge Market · Squeeks</title>
+  <meta name="description" content="Buy, sell and swap Squeeks peer to peer, and find the partner your Squeek needs to merge. Fee-free, non-custodial, on Sepolia.">
+  <meta property="og:title" content="Merge Market · Squeeks">
+  <meta property="og:description" content="Every Squeek in one market. Find your merge partner.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    try { const t = localStorage.getItem("mm-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
   <link rel="stylesheet" href="/assets/styles.css">
-  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/"><span class="mark" aria-hidden="true">⇄</span>MERGE<span>MARKET</span></a>
-    <nav class="nav">
-      <a href="#mine">Your Squeeks</a>
-      <a href="#market">Market</a>
+  <header class="bar">
+    <a class="brand" href="/" aria-label="Merge Market home"><span class="logo" aria-hidden="true">⇄</span><span>MERGE_MARKET</span></a>
+    <label class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" inputmode="numeric" placeholder="Search Squeek #" autocomplete="off" aria-label="Search by Squeek number">
+      <kbd>/</kbd>
+    </label>
+    <nav class="bar-links">
       <a href="/how.html">How it works</a>
     </nav>
-    <button class="btn btn-small" id="connect">Connect wallet</button>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch light or dark theme" title="Theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <button class="btn btn-dark" id="connect" type="button">Connect</button>
   </header>
 
-  <main class="wrap">
-    <section class="hero">
-      <p class="eyebrow">SQUEEKCHAIN · SEPOLIA</p>
-      <h1>Find your Squeek's<br>merge partner.</h1>
-      <p class="lede">Merging needs two Squeeks of the same level. Merge Market shows which of yours are missing a partner, finds one on the market, and trades it to you in a single transaction. Then merge.</p>
-      <ul class="facts">
-        <li><strong>Ownerless</strong><span>No admin, no pause, no upgrade</span></li>
-        <li><strong>Fee-free</strong><span>Only the collection's royalty</span></li>
-        <li><strong>Non-custodial</strong><span>Squeeks stay in your wallet until they trade</span></li>
-      </ul>
-      <p class="notice" id="no-market" hidden>The market contract is not deployed yet. You can browse your Squeeks; trading opens once it is live.</p>
-      <p class="notice warn" id="net-warn" hidden>Your wallet is on another network. <button class="linklike" id="switch-net">Switch to Sepolia</button></p>
-    </section>
+  <div class="netwarn" id="net-warn" hidden>Your wallet is not on Sepolia. <button class="link" id="switch-net" type="button">Switch to Sepolia</button></div>
 
-    <section class="panel" id="mine">
-      <div class="panel-head">
-        <h2>Your Squeeks</h2>
-        <span class="muted small" id="mine-meta"></span>
-      </div>
-      <div id="pairs" class="pairs"></div>
-      <div id="mine-grid" class="grid"><p class="muted">Connect your wallet to see your Squeeks.</p></div>
-    </section>
+  <section class="banner" aria-hidden="true">
+    <div class="banner-art" id="banner-art"></div>
+    <div class="banner-title">SQUEEKS_</div>
+  </section>
 
-    <section class="panel" id="market">
-      <div class="panel-head">
-        <h2>Market</h2>
-        <button class="btn btn-small btn-ghost" id="post-bid">Post a bid</button>
-      </div>
-      <div class="filters">
-        <div class="seg" role="tablist" id="kind-tabs">
-          <button role="tab" data-kind="all" aria-selected="true">All</button>
-          <button role="tab" data-kind="0" aria-selected="false">For sale</button>
-          <button role="tab" data-kind="1" aria-selected="false">Swaps</button>
-          <button role="tab" data-kind="2" aria-selected="false">Bids</button>
+  <section class="coll wrap">
+    <div class="coll-id">
+      <div class="avatar"><img id="avatar" alt=""></div>
+      <div>
+        <h1>Squeeks_</h1>
+        <div class="chips">
+          <span class="chip" id="chip-items">— ITEMS</span>
+          <span class="chip">LEVELS 1–<span id="chip-max">10</span></span>
+          <span class="chip">0% MARKET FEE</span>
+          <span class="chip chip-net">SEPOLIA</span>
         </div>
-        <label class="level-filter">Level
-          <select id="level-filter"><option value="">Any</option></select>
-        </label>
       </div>
-      <div id="orders" class="orders"><p class="muted">Loading the market…</p></div>
+    </div>
+    <dl class="stats">
+      <div><dt>FLOOR_</dt><dd id="st-floor">—</dd></div>
+      <div><dt>BEST_BID_</dt><dd id="st-bid">—</dd></div>
+      <div><dt>VOLUME_</dt><dd id="st-volume">—</dd></div>
+      <div><dt>LISTED_</dt><dd id="st-listed">—</dd></div>
+      <div><dt>OWNERS_</dt><dd id="st-owners">—</dd></div>
+      <div><dt>MERGED_</dt><dd id="st-merged">—</dd></div>
+    </dl>
+  </section>
+
+  <nav class="tabs wrap" role="tablist">
+    <button role="tab" data-tab="items" aria-selected="true">ITEMS_</button>
+    <button role="tab" data-tab="offers" aria-selected="false">OFFERS_ <span class="count" id="count-offers"></span></button>
+    <button role="tab" data-tab="merge" aria-selected="false">MERGE_ <span class="tag">FIND PARTNER</span></button>
+    <button role="tab" data-tab="activity" aria-selected="false">ACTIVITY_</button>
+    <span class="tabs-spacer"></span>
+    <button class="btn btn-ghost btn-sm" id="post-bid" type="button">Make a level bid</button>
+  </nav>
+
+  <main class="wrap">
+    <!-- ITEMS -->
+    <section class="panel-items" id="tab-items">
+      <aside class="filters" id="filters">
+        <div class="fgroup">
+          <div class="flabel">STATUS_</div>
+          <div class="seg" id="status-seg">
+            <button data-status="all" aria-pressed="true">All</button>
+            <button data-status="listed" aria-pressed="false">Listed</button>
+            <button data-status="mine" aria-pressed="false">Owned by you</button>
+            <button data-status="staked" aria-pressed="false">Staked</button>
+          </div>
+        </div>
+        <div class="fgroup">
+          <div class="flabel">LEVEL_ <button class="link small" id="levels-clear" type="button" hidden>clear</button></div>
+          <ul class="levels" id="levels"></ul>
+        </div>
+        <div class="fgroup finfo">
+          <div class="flabel">ABOUT_</div>
+          <p>Two Squeeks of the same level merge into one a level higher with 10% more power. Use <b>MERGE_</b> to find the partner yours needs.</p>
+        </div>
+      </aside>
+
+      <section class="results">
+        <div class="toolbar">
+          <button class="btn btn-ghost btn-sm only-mobile" id="filters-toggle" type="button">Filters</button>
+          <span class="showing" id="showing">Loading Squeeks…</span>
+          <span class="grow"></span>
+          <select id="sort" aria-label="Sort">
+            <option value="price">price low to high</option>
+            <option value="price-desc">price high to low</option>
+            <option value="level">level high to low</option>
+            <option value="id">number</option>
+          </select>
+          <div class="seg seg-sm" id="cols-seg" aria-label="Grid size">
+            <button data-cols="4" aria-pressed="false">4</button>
+            <button data-cols="6" aria-pressed="true">6</button>
+            <button data-cols="10" aria-pressed="false">10</button>
+          </div>
+          <button class="icon-btn" id="refresh" type="button" aria-label="Refresh" title="Refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          </button>
+        </div>
+        <div class="grid" id="grid" data-cols="6"></div>
+        <nav class="pager" id="pager" aria-label="Pages"></nav>
+      </section>
     </section>
 
-    <section class="panel" id="my-orders-panel" hidden>
-      <div class="panel-head">
-        <h2>Your orders</h2>
-        <button class="btn btn-small btn-ghost" id="withdraw" hidden>Withdraw credit</button>
+    <!-- OFFERS -->
+    <section id="tab-offers" hidden>
+      <div class="toolbar">
+        <div class="seg seg-sm" id="offer-seg">
+          <button data-kind="all" aria-pressed="true">All</button>
+          <button data-kind="2" aria-pressed="false">Level bids</button>
+          <button data-kind="1" aria-pressed="false">Swaps</button>
+          <button data-kind="0" aria-pressed="false">For sale</button>
+        </div>
+        <span class="grow"></span>
+        <select id="offer-level" aria-label="Level"></select>
       </div>
-      <div id="my-orders" class="orders"></div>
+      <div class="table-wrap">
+        <table class="table" id="offers-table">
+          <thead><tr><th>TYPE</th><th>ITEM</th><th>WANTS</th><th class="num">PRICE</th><th>FROM</th><th>EXPIRES</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty" id="offers-empty" hidden></p>
     </section>
 
-    <footer class="foot">
-      <p>Merge Market is an independent, open-source tool for Squeekchain, not affiliated with it. Contract: <a id="market-link" target="_blank" rel="noopener">—</a> · <a href="https://github.com/0xdogacan/squeek-merge-market" target="_blank" rel="noopener">Source</a></p>
-      <p>Testnet only. Sepolia ETH and test Squeeks have no value.</p>
-    </footer>
+    <!-- MERGE -->
+    <section id="tab-merge" hidden>
+      <div id="merge-body"></div>
+    </section>
+
+    <!-- ACTIVITY -->
+    <section id="tab-activity" hidden>
+      <div class="table-wrap">
+        <table class="table" id="activity-table">
+          <thead><tr><th>EVENT</th><th>ITEM</th><th class="num">PRICE</th><th>FROM</th><th>TO</th><th>TIME</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty" id="activity-empty" hidden></p>
+    </section>
   </main>
 
-  <dialog id="sheet" class="sheet">
+  <footer class="foot wrap">
+    <span><span class="live-dot"></span> Sepolia · block <span id="foot-block">—</span></span>
+    <span>Contract <a id="market-link" target="_blank" rel="noopener">—</a> · verified on Sourcify</span>
+    <span><a href="https://github.com/0xdogacan/squeek-merge-market" target="_blank" rel="noopener">Source</a> · <a href="/how.html">How it works</a></span>
+    <span class="muted">Independent, open-source tool for Squeekchain. Testnet only: Sepolia ETH and test Squeeks have no value.</span>
+  </footer>
+
+  <!-- Item detail -->
+  <dialog id="item" class="modal modal-item" aria-labelledby="item-title">
+    <button class="modal-x" data-close type="button" aria-label="Close">×</button>
+    <div class="item-grid">
+      <div class="item-art"><img id="item-img" alt=""></div>
+      <div class="item-info">
+        <div class="eyebrow" id="item-eyebrow">SQUEEK</div>
+        <h2 id="item-title">Squeek</h2>
+        <div class="item-owner" id="item-owner"></div>
+        <div class="kv" id="item-kv"></div>
+        <div class="price-box" id="item-price"></div>
+        <div class="item-actions" id="item-actions"></div>
+        <div class="item-section" id="item-merge"></div>
+        <div class="item-section" id="item-traits"></div>
+        <div class="item-section" id="item-orders"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Forms -->
+  <dialog id="sheet" class="modal modal-form" aria-labelledby="sheet-title">
     <form method="dialog" id="sheet-form">
-      <h2 id="sheet-title"></h2>
+      <button class="modal-x" id="sheet-x" type="button" aria-label="Close">×</button>
+      <h3 id="sheet-title"></h3>
       <div id="sheet-body"></div>
-      <p class="error" id="sheet-error" hidden></p>
-      <div class="actions">
+      <p class="form-error" id="sheet-error" hidden></p>
+      <div class="form-actions">
         <button type="button" class="btn btn-ghost" id="sheet-cancel">Cancel</button>
-        <button type="submit" class="btn" id="sheet-go">Confirm</button>
+        <button type="submit" class="btn btn-dark" id="sheet-go">Confirm</button>
       </div>
     </form>
   </dialog>
 
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script type="module" src="/assets/app.js"></script>
 </body>

@@ -6,7 +6,7 @@
 - **Swap** — offer your Squeek for a specific Squeek, or for any Squeek of a level. Both move in one transaction.
 - **Bid** — escrow ETH for any Squeek of a level ("I need a Level 3"). Cancel any time to get it back.
 
-The site reads your Squeeks (wallet and Staking), levels and merge cooldowns, shows merge-ready pairs with a one-click merge (`SqueekNFT.merge`, or `SqueekStaking.mergeDeposited` for staked pairs), and for every Squeek without a partner, shows matching offers and the power you would have after merging (from `SqueekStaking.basePower`).
+The site shows every Squeek in one market (art from the Squeekchain API with an on-chain `tokenURI` fallback, level and status filters, sorting, item pages, offers and activity). The Merge tab reads your Squeeks (wallet and Staking), levels and merge cooldowns, shows merge-ready pairs with a one-click merge (`SqueekNFT.merge`, or `SqueekStaking.mergeDeposited` for staked pairs), and for every Squeek without a partner, shows matching offers and the power you would have after merging (from `SqueekStaking.basePower`).
 
 ## Contract
 
@@ -37,7 +37,7 @@ Plain HTML, CSS and JS modules (ethers v6 vendored), no build step. Vercel funct
 | Endpoint | Purpose |
 | --- | --- |
 | `api/rpc.js` | Read-only JSON-RPC proxy to public Sepolia endpoints |
-| `api/owners.js` | Current owner of every Squeek, indexed from SqueekNFT `Transfer` events |
+| `api/collection.js` | Every live Squeek with owner (depositor if staked) and level, indexed from SqueekNFT `Transfer` events and Multicall3 |
 | `api/verify.js` | Submits source and metadata to Sourcify |
 
 `deploy.html` deploys the contract from the visitor's wallet and verifies it on Sourcify. After deploying, set `market` in `assets/config.js`.
