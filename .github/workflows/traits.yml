@@ -1,0 +1,40 @@
+name: Build Squeek traits
+
+# Rebuilds assets/traits.json (trait filters on the site). Traits are fixed after the
+# reveal, so a daily check is plenty; it only commits when something changed.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [scripts/build-traits.mjs, .github/workflows/traits.yml]
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: traits
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/build-traits.mjs
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- assets/traits.json && git ls-files --error-unmatch assets/traits.json >/dev/null 2>&1; then
+            echo "No changes"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/traits.json
+          git commit -m "Update Squeek traits"
+          git pull --rebase
+          git push

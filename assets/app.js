@@ -50,8 +50,10 @@ const S = {
   volume: 0n,
   minBlock: 0,
   tab: "items",
-  status: "all",
+  status: "all",          // all | listed | unlisted
+  stake: "",              // "" | staked | unstaked
   levels: new Set(),
+  traits: new Map(),      // category index -> Set of value indexes
   sort: "price",
   cols: "6",
   page: 1,
@@ -401,6 +403,20 @@ async function loadActivity() {
   S.activity = rows.reverse();
 }
 
+// Traits come from assets/traits.json, built by a GitHub Action from Squeek metadata.
+const TR = { categories: [], rows: new Map(), loaded: false };
+async function loadTraits() {
+  if (TR.loaded) return;
+  TR.loaded = true;
+  try {
+    const r = await fetch("/assets/traits.json");
+    if (!r.ok) return;
+    const j = await r.json();
+    TR.categories = j.categories || [];
+    for (const row of j.t || []) TR.rows.set(row[0], row);
+  } catch { /* no trait filters */ }
+}
+
 async function loadMine() {
   S.nextMerge = new Map();
   if (!S.account) return;
@@ -413,7 +429,7 @@ async function loadMine() {
 async function refreshAll({ quiet = false } = {}) {
   try {
     if (!S.loaded) await loadBasics();
-    await Promise.all([loadCollection(), loadOrders()]);
+    await Promise.all([loadCollection(), loadOrders(), loadTraits()]);
     await Promise.all([loadMine(), loadActivity().catch((e) => console.warn("activity", e))]);
     S.loaded = true;
   } catch (err) {
@@ -496,9 +512,17 @@ function renderBanner() {
 function filtered() {
   let list = [...S.tokens.values()];
   if (S.status === "listed") list = list.filter((t) => S.sells.has(t.id));
-  else if (S.status === "mine") list = list.filter(isMine);
-  else if (S.status === "staked") list = list.filter((t) => t.staked);
+  else if (S.status === "unlisted") list = list.filter((t) => !S.sells.has(t.id));
+  if (S.stake === "staked") list = list.filter((t) => t.staked);
+  else if (S.stake === "unstaked") list = list.filter((t) => !t.staked);
   if (S.levels.size) list = list.filter((t) => S.levels.has(t.level));
+  if (S.traits.size) {
+    const want = [...S.traits.entries()];
+    list = list.filter((t) => {
+      const row = TR.rows.get(t.id);
+      return row && want.every(([c, vals]) => vals.has(row[1 + c]));
+    });
+  }
   const price = (t) => S.sells.get(t.id)?.price;
   const byPrice = (dir) => (a, b) => {
     const pa = price(a), pb = price(b);
@@ -563,9 +587,8 @@ function renderItems() {
   itemList = filtered();
   S.page = Math.max(1, Math.min(S.page, Math.ceil(itemList.length / PAGE)));
   if (!itemList.length) {
-    const msg = S.status === "mine" && !S.account ? `<b>Connect your wallet</b> to see your Squeeks.<br><button class="btn btn-dark" data-act="connect">Connect</button>`
-      : S.status === "mine" ? `No Squeeks in this wallet on Sepolia.`
-      : S.status === "listed" ? `Nothing listed${S.levels.size ? " at this level" : ""} yet. Own a Squeek? Open it and list it, or post a level bid.`
+    const msg = S.status === "listed" && !S.levels.size && !S.traits.size && !S.stake
+      ? `Nothing listed yet. Own a Squeek? Open it and list it, or post a level bid.`
       : "No Squeeks match these filters.";
     grid.innerHTML = `<div class="empty">${msg}</div>`;
     grid.querySelector("[data-act=connect]")?.addEventListener("click", connect);
@@ -573,6 +596,115 @@ function renderItems() {
     grid.replaceChildren(...itemList.slice(0, S.page * PAGE).map(itemCard));
   }
   updateShowing();
+  renderActiveFilters();
+}
+
+function renderActiveFilters() {
+  const box = $("active-f");
+  const chips = [];
+  const chip = (label, onRemove) => {
+    const b = el("button", "", `${label} <span>×</span>`);
+    b.type = "button";
+    b.addEventListener("click", () => { onRemove(); syncFilterControls(); resetItems(); });
+    chips.push(b);
+  };
+  for (const l of [...S.levels].sort((a, b) => a - b)) chip(`Level ${l}`, () => S.levels.delete(l));
+  if (S.stake) chip(S.stake === "staked" ? "Staked" : "Not staked", () => { S.stake = ""; });
+  for (const [c, vals] of S.traits) for (const v of vals) {
+    const cat = TR.categories[c];
+    chip(`${esc(cat.name)}: ${esc(cat.values[v])}`, () => { vals.delete(v); if (!vals.size) S.traits.delete(c); });
+  }
+  box.hidden = !chips.length;
+  if (chips.length > 1) {
+    const all = el("button", "clear-all", "Clear all");
+    all.type = "button";
+    all.addEventListener("click", () => { S.levels.clear(); S.stake = ""; S.traits.clear(); syncFilterControls(); resetItems(); });
+    chips.push(all);
+  }
+  box.replaceChildren(...chips);
+}
+
+function syncFilterControls() {
+  pressSeg($("stake-seg"), "stake", S.stake);
+  renderLevels();
+  renderTraitFilters();
+}
+
+/* Trait filters: one collapsible list per category, with counts over live Squeeks. */
+const openCats = new Set();
+const CHEVRON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
+
+function renderTraitFilters() {
+  const group = $("traits-group");
+  group.hidden = !TR.categories.length;
+  if (!TR.categories.length) return;
+  const counts = TR.categories.map(() => new Map());
+  for (const id of S.tokens.keys()) {
+    const row = TR.rows.get(id);
+    if (!row) continue;
+    for (let c = 0; c < TR.categories.length; c++) {
+      const v = row[1 + c];
+      if (v >= 0) counts[c].set(v, (counts[c].get(v) || 0) + 1);
+    }
+  }
+  const box = $("traits-f");
+  box.replaceChildren(...TR.categories.map((cat, c) => {
+    const sel = S.traits.get(c);
+    const wrap = el("div", `tcat${openCats.has(c) ? " open" : ""}`);
+    const head = el("button", "", `<span>${esc(cat.name)}</span>${sel?.size ? `<span class="sel">${sel.size} selected</span>` : ""}<span class="n">${fmt(counts[c].size)}</span>${CHEVRON}`);
+    head.type = "button";
+    head.setAttribute("aria-expanded", String(openCats.has(c)));
+    const body = el("div", "tcat-body");
+    head.addEventListener("click", () => {
+      const open = wrap.classList.toggle("open");
+      head.setAttribute("aria-expanded", String(open));
+      if (open) { openCats.add(c); if (!body.childElementCount) fillTraitBody(body, cat, c, counts[c]); } else openCats.delete(c);
+    });
+    if (openCats.has(c)) fillTraitBody(body, cat, c, counts[c]);
+    wrap.append(head, body);
+    return wrap;
+  }));
+  $("traits-clear").hidden = !S.traits.size;
+}
+
+function fillTraitBody(body, cat, c, counts) {
+  const values = [...counts.entries()].sort((a, b) => b[1] - a[1] || String(cat.values[a[0]]).localeCompare(String(cat.values[b[0]])));
+  const LIMIT = 80;
+  const list = el("ul");
+  const note = el("div", "more-v");
+  const draw = (q = "") => {
+    const ql = q.trim().toLowerCase();
+    const match = ql ? values.filter(([v]) => String(cat.values[v]).toLowerCase().includes(ql)) : values;
+    // Selected values stay visible even when they fall outside the first LIMIT.
+    const sel = S.traits.get(c) || new Set();
+    const shown = match.slice(0, LIMIT);
+    for (const v of sel) if (!shown.some(([x]) => x === v) && counts.has(v)) shown.unshift([v, counts.get(v)]);
+    list.replaceChildren(...shown.map(([v, n]) => {
+      const li = el("li", "", `<label><input type="checkbox" ${sel.has(v) ? "checked" : ""}><span title="${esc(cat.values[v])}">${esc(cat.values[v])}</span><span class="n">${fmt(n)}</span></label>`);
+      li.querySelector("input").addEventListener("change", (e) => {
+        let set = S.traits.get(c);
+        if (e.target.checked) { if (!set) { set = new Set(); S.traits.set(c, set); } set.add(v); }
+        else if (set) { set.delete(v); if (!set.size) S.traits.delete(c); }
+        const headSel = body.parentElement.querySelector(":scope > button .sel");
+        const size = S.traits.get(c)?.size || 0;
+        if (headSel) headSel.textContent = size ? `${size} selected` : "";
+        else if (size) body.parentElement.querySelector(":scope > button .n").insertAdjacentHTML("beforebegin", `<span class="sel">${size} selected</span>`);
+        $("traits-clear").hidden = !S.traits.size;
+        resetItems();
+      });
+      return li;
+    }));
+    note.textContent = match.length > LIMIT ? `${fmt(match.length - LIMIT)} more: type to search` : "";
+  };
+  if (values.length > 10) {
+    const q = el("input");
+    q.type = "search";
+    q.placeholder = `Search ${cat.name.toLowerCase()}`;
+    q.addEventListener("input", () => draw(q.value));
+    body.append(q);
+  }
+  body.append(list, note);
+  draw();
 }
 
 function resetItems() {
@@ -847,7 +979,9 @@ function openItem(id) {
 
 function renderTraits(id, m) {
   const box = $("item-traits");
-  const attrs = (m?.attrs || []).filter((a) => a.k !== "" && a.v !== undefined && a.v !== null);
+  let attrs = (m?.attrs || []).filter((a) => a.k !== "" && a.v !== undefined && a.v !== null);
+  const row = TR.rows.get(id);
+  if (!attrs.length && row) attrs = TR.categories.map((c, i) => ({ k: c.name, v: c.values[row[1 + i]] })).filter((a) => a.v !== undefined);
   box.innerHTML = attrs.length ? `<h4>TRAITS</h4><div class="traits">${attrs.map((a) => `<div><span>${esc(a.k)}</span><b>${esc(a.v)}</b></div>`).join("")}</div>` : "";
 }
 
@@ -1119,6 +1253,7 @@ async function doMerge(a, b) {
 function renderAll() {
   renderHeader();
   renderLevels();
+  renderTraitFilters();
   renderItems();
   if (S.tab === "offers") renderOffers();
   if (S.tab === "merge") renderMerge();
@@ -1153,7 +1288,6 @@ document.querySelectorAll(".tabs [role=tab]").forEach((b) => b.addEventListener(
 $("status-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   S.status = b.dataset.status;
-  if (S.status === "listed" && S.sort === "id") S.sort = "price";
   pressSeg($("status-seg"), "status", S.status);
   resetItems();
 });
@@ -1172,7 +1306,14 @@ $("sort").addEventListener("change", (e) => { S.sort = e.target.value; resetItem
 $("levels-clear").addEventListener("click", () => { S.levels.clear(); renderLevels(); resetItems(); });
 $("filters-toggle").addEventListener("click", () => $("filters").classList.toggle("open"));
 $("refresh").addEventListener("click", () => refreshAll());
-$("connect").addEventListener("click", () => { if (!S.account) connect(); else { S.status = "mine"; pressSeg($("status-seg"), "status", "mine"); setTab("items"); renderItems(); } });
+$("connect").addEventListener("click", () => { if (!S.account) connect(); else setTab("merge"); });
+$("stake-seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.stake = S.stake === b.dataset.stake ? "" : b.dataset.stake; // one at a time; click again to clear
+  pressSeg($("stake-seg"), "stake", S.stake);
+  resetItems();
+});
+$("traits-clear").addEventListener("click", () => { S.traits.clear(); renderTraitFilters(); resetItems(); });
 $("switch-net").addEventListener("click", switchNetwork);
 $("post-bid").addEventListener("click", () => openBid(S.levels.size === 1 ? [...S.levels][0] : null));
 $("theme").addEventListener("click", () => {

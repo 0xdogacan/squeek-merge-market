@@ -80,13 +80,23 @@
           <div class="seg" id="status-seg">
             <button data-status="all" aria-pressed="true">All</button>
             <button data-status="listed" aria-pressed="false">Listed</button>
-            <button data-status="mine" aria-pressed="false">Owned by you</button>
-            <button data-status="staked" aria-pressed="false">Staked</button>
+            <button data-status="unlisted" aria-pressed="false">Not listed</button>
           </div>
         </div>
         <div class="fgroup">
           <div class="flabel">LEVEL <button class="link small" id="levels-clear" type="button" hidden>clear</button></div>
           <ul class="levels" id="levels"></ul>
+        </div>
+        <div class="fgroup">
+          <div class="flabel">STAKE</div>
+          <div class="seg" id="stake-seg">
+            <button data-stake="staked" aria-pressed="false">Staked</button>
+            <button data-stake="unstaked" aria-pressed="false">Not staked</button>
+          </div>
+        </div>
+        <div class="fgroup" id="traits-group" hidden>
+          <div class="flabel">TRAITS <button class="link small" id="traits-clear" type="button" hidden>clear</button></div>
+          <div class="traits-f" id="traits-f"></div>
         </div>
         <div class="fgroup finfo">
           <div class="flabel">ABOUT</div>
@@ -114,6 +124,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
           </button>
         </div>
+        <div class="active-f" id="active-f" hidden></div>
         <div class="grid" id="grid" data-cols="6"></div>
         <div class="more" id="more" aria-hidden="true"><span></span><span></span><span></span></div>
       </section>

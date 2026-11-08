@@ -126,7 +126,7 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- items layout */
 .panel-items { display: grid; grid-template-columns: 236px 1fr; gap: 28px; padding: 24px 0 8px; }
-.filters { position: sticky; top: 88px; align-self: start; display: grid; gap: 26px; }
+.filters { position: sticky; top: 88px; align-self: start; display: grid; gap: 26px; max-height: calc(100vh - 104px); overflow-y: auto; padding-right: 6px; scrollbar-width: thin; }
 .flabel { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .seg button {
@@ -141,6 +141,26 @@ button, input, select { font: inherit; color: inherit; }
 .levels input { accent-color: var(--ink); width: 15px; height: 15px; margin: 0; }
 .levels .n { margin-left: auto; color: var(--muted); font-size: 12px; }
 .levels .pw { color: var(--muted); font-size: 11px; }
+.traits-f { border-top: 1px solid var(--line); }
+.tcat { border-bottom: 1px solid var(--line); }
+.tcat > button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 11px 2px; background: none; border: 0; cursor: pointer; font-size: 13px; text-align: left; }
+.tcat > button .n { margin-left: auto; color: var(--muted); font-size: 12px; }
+.tcat > button .sel { color: var(--accent); font-size: 11px; }
+.tcat > button svg { width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 2; transition: transform .15s; flex: none; }
+.tcat.open > button svg { transform: rotate(180deg); }
+.tcat-body { display: none; padding: 0 0 10px; }
+.tcat.open .tcat-body { display: block; }
+.tcat-body input[type="search"] { width: 100%; height: 32px; padding: 0 10px; margin-bottom: 6px; border: 1px solid var(--line-strong); border-radius: 2px; background: var(--surface); font-size: 12px; }
+.tcat-body ul { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.tcat-body label { display: flex; align-items: center; gap: 8px; padding: 5px 2px; cursor: pointer; font-size: 12.5px; }
+.tcat-body label span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tcat-body input[type="checkbox"] { accent-color: var(--ink); width: 14px; height: 14px; margin: 0; flex: none; }
+.tcat-body .n { margin-left: auto; color: var(--muted); font-size: 11.5px; padding-left: 6px; }
+.tcat-body .more-v { color: var(--muted); font-size: 11.5px; padding: 6px 2px 0; }
+.active-f { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.active-f button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 12px; cursor: pointer; border-radius: 2px; }
+.active-f button span { color: var(--muted); }
+.active-f .clear-all { border: 0; background: none; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .finfo p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 .finfo b { color: var(--ink); font-weight: 500; }
 
@@ -358,7 +378,7 @@ select {
 }
 @media (max-width: 980px) {
   .panel-items { grid-template-columns: 1fr; gap: 16px; }
-  .filters { position: static; display: none; padding: 16px; background: var(--surface); border: 1px solid var(--line); }
+  .filters { position: static; display: none; padding: 16px; max-height: none; background: var(--surface); border: 1px solid var(--line); }
   .filters.open { display: grid; }
   .only-mobile { display: inline-flex; }
   .grid[data-cols="4"] { --cols: 3; }
